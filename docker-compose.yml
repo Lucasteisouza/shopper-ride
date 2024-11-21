@@ -1,0 +1,61 @@
+services:
+  backend:
+    container_name: shopper-ride-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=shopper_ride
+    ports:
+      - "8080:8080"
+    networks:
+      - app-network
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    container_name: shopper-ride-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    networks:
+      - app-network
+    depends_on:
+      - backend
+
+  db:
+    container_name: shopper-ride-db
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=shopper_ride
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  app-network:
+    driver: bridge
+    name: shopper-ride_app-network
+
+volumes:
+  postgres_data:
+    name: shopper-ride_postgres_data
