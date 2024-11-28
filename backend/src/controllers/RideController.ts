@@ -8,15 +8,29 @@ export class RideController {
         try {
             const { customer_id, origin, destination } = req.body;
 
+            console.log('Estimating ride with params:', {
+                customer_id,
+                origin,
+                destination
+            });
+
             const estimate = await this.rideService.estimateRide(
                 customer_id,
                 origin,
                 destination
             );
 
+            console.log('Ride estimate successful:', estimate);
             res.json(estimate);
         } catch (error: any) {
-            if (error.message.startsWith('INVALID_DATA:')) {
+            console.error('Error in estimateRide:', error);
+
+            if (error.message?.includes('Google Maps API Error')) {
+                res.status(400).json({
+                    error_code: 'GOOGLE_MAPS_ERROR',
+                    error_description: error.message
+                });
+            } else if (error.message?.startsWith('INVALID_DATA:')) {
                 res.status(400).json({
                     error_code: 'INVALID_DATA',
                     error_description: error.message.split(': ')[1]
@@ -24,7 +38,7 @@ export class RideController {
             } else {
                 res.status(500).json({
                     error_code: 'INTERNAL_ERROR',
-                    error_description: 'An unexpected error occurred'
+                    error_description: error.message || 'An unexpected error occurred'
                 });
             }
         }
@@ -32,22 +46,23 @@ export class RideController {
 
     confirmRide = async (req: Request, res: Response): Promise<void> => {
         try {
+            console.log('Confirming ride with data:', req.body);
             const result = await this.rideService.confirmRide(req.body);
+            console.log('Ride confirmed:', result);
             res.json(result);
         } catch (error: any) {
-            const errorMap: { [key: string]: number } = {
-                'INVALID_DATA': 400,
-                'DRIVER_NOT_FOUND': 404,
-                'INVALID_DISTANCE': 406
-            };
-
-            const [errorCode, errorMessage] = error.message.split(': ');
-            const statusCode = errorMap[errorCode] || 500;
-
-            res.status(statusCode).json({
-                error_code: errorCode,
-                error_description: errorMessage || 'An unexpected error occurred'
-            });
+            console.error('Error confirming ride:', error);
+            if (error.message?.startsWith('INVALID_DATA:')) {
+                res.status(400).json({
+                    error_code: 'INVALID_DATA',
+                    error_description: error.message.split(': ')[1]
+                });
+            } else {
+                res.status(500).json({
+                    error_code: 'INTERNAL_ERROR',
+                    error_description: error.message || 'An unexpected error occurred'
+                });
+            }
         }
     };
 
@@ -59,6 +74,8 @@ export class RideController {
             const history = await this.rideService.getRideHistory(customerId, driverId);
             res.json(history);
         } catch (error: any) {
+            console.error('Error in getRideHistory:', error);
+
             const [errorCode, errorMessage] = error.message.split(': ');
 
             if (errorCode === 'INVALID_DATA' || errorCode === 'INVALID_DRIVER') {
@@ -85,6 +102,8 @@ export class RideController {
             const activeRides = await this.rideService.getActiveRides();
             res.json(activeRides);
         } catch (error: any) {
+            console.error('Error in getActiveRides:', error);
+
             const [errorCode, errorMessage] = error.message.split(': ');
 
             if (errorCode === 'NO_RIDES_FOUND') {
@@ -100,4 +119,10 @@ export class RideController {
             }
         }
     };
+
+    async completeRide(req: Request, res: Response) {
+        const rideId = parseInt(req.params.ride_id);
+        const result = await this.rideService.completeRide(rideId);
+        res.json(result);
+    }
 }

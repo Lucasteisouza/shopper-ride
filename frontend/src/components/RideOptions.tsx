@@ -3,35 +3,45 @@ import {
     Box,
     Card,
     CardContent,
-    Typography,
+    CardActions,
     Button,
-    Rating,
+    Typography,
     Grid,
     Alert,
-    CircularProgress
+    CircularProgress,
+    Paper
 } from '@mui/material';
-import { RouteEstimate, Driver } from '../types';
 import { confirmRide } from '../services/api';
-import { useNavigate } from 'react-router-dom';
+import { RouteEstimate, Driver } from '../types';
 
 interface RideOptionsProps {
     estimate: RouteEstimate;
+    onRideConfirmed: (rideDetails: any) => void;
 }
 
-export const RideOptions: React.FC<RideOptionsProps> = ({ estimate }) => {
-    const [error, setError] = useState<string>('');
+export const RideOptions: React.FC<RideOptionsProps> = ({ estimate, onRideConfirmed }) => {
+    const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
 
     const handleConfirm = async (driver: Driver) => {
         setError('');
         setLoading(true);
 
+        const customerId = localStorage.getItem('customerId');
+        const origin = localStorage.getItem('origin');
+        const destination = localStorage.getItem('destination');
+
+        if (!customerId || !origin || !destination) {
+            setError('Missing ride information. Please start a new ride request.');
+            setLoading(false);
+            return;
+        }
+
         try {
-            await confirmRide({
-                customer_id: localStorage.getItem('customerId') || '',
-                origin: localStorage.getItem('origin') || '',
-                destination: localStorage.getItem('destination') || '',
+            const result = await confirmRide({
+                customer_id: customerId,
+                origin: origin,
+                destination: destination,
                 distance: estimate.distance,
                 duration: estimate.duration,
                 driver: {
@@ -41,7 +51,22 @@ export const RideOptions: React.FC<RideOptionsProps> = ({ estimate }) => {
                 value: driver.value
             });
 
-            navigate('/history');
+            // Get the selected driver's full details from the estimate options
+            const selectedDriver = estimate.options.find(opt => opt.id === driver.id);
+            
+            if (!selectedDriver) {
+                throw new Error('Selected driver not found in options');
+            }
+
+            const rideDetails = {
+                rideId: result.id,
+                driverName: result.driver.name,
+                driverVehicle: result.driver.vehicle,
+                origin: origin,
+                destination: destination
+            };
+
+            onRideConfirmed(rideDetails);
         } catch (err: any) {
             const apiError = err.response?.data;
             setError(apiError?.error_description || 'Failed to confirm ride');
@@ -51,33 +76,24 @@ export const RideOptions: React.FC<RideOptionsProps> = ({ estimate }) => {
     };
 
     return (
-        <Box sx={{ mt: 4 }}>
-            <Typography variant="h5" gutterBottom>
-                Available Drivers
-            </Typography>
-
-            <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle1">
-                    Distance: {estimate.distance.toFixed(2)} km
+        <Box sx={{ maxWidth: 800, mx: 'auto' }}>
+            <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+                <Typography variant="h5" gutterBottom>
+                    Ride Details
                 </Typography>
-                <Typography variant="subtitle1">
-                    Estimated Duration: {estimate.duration}
+                <Typography variant="body1">
+                    From: {localStorage.getItem('origin')}
                 </Typography>
-            </Box>
-
-            {/* Static Map */}
-            <Box
-                component="img"
-                sx={{
-                    width: '100%',
-                    height: 300,
-                    objectFit: 'cover',
-                    mb: 3,
-                    borderRadius: 1
-                }}
-                alt="Route Map"
-                src={`https://maps.googleapis.com/maps/api/staticmap?size=600x300&path=color:0x0000ff|weight:5|${estimate.origin.latitude},${estimate.origin.longitude}|${estimate.destination.latitude},${estimate.destination.longitude}&markers=color:red|label:A|${estimate.origin.latitude},${estimate.origin.longitude}&markers=color:red|label:B|${estimate.destination.latitude},${estimate.destination.longitude}&key=${process.env.REACT_APP_GOOGLE_API_KEY}`}
-            />
+                <Typography variant="body1">
+                    To: {localStorage.getItem('destination')}
+                </Typography>
+                <Typography variant="body1">
+                    Distance: {estimate.distance} km
+                </Typography>
+                <Typography variant="body1">
+                    Duration: {estimate.duration}
+                </Typography>
+            </Paper>
 
             {error && (
                 <Alert severity="error" sx={{ mb: 3 }}>
@@ -85,44 +101,41 @@ export const RideOptions: React.FC<RideOptionsProps> = ({ estimate }) => {
                 </Alert>
             )}
 
+            <Typography variant="h5" gutterBottom>
+                Available Drivers
+            </Typography>
+
             <Grid container spacing={3}>
                 {estimate.options.map((driver) => (
-                    <Grid item xs={12} md={4} key={driver.id}>
+                    <Grid item xs={12} sm={6} md={4} key={driver.id}>
                         <Card>
                             <CardContent>
-                                <Typography variant="h6" gutterBottom>
+                                <Typography variant="h6">
                                     {driver.name}
                                 </Typography>
-
-                                <Typography variant="body2" color="text.secondary" paragraph>
-                                    {driver.description}
-                                </Typography>
-
-                                <Typography variant="body2" color="text.secondary">
+                                <Typography color="text.secondary">
                                     Vehicle: {driver.vehicle}
                                 </Typography>
-
-                                <Box sx={{ my: 1, display: 'flex', alignItems: 'center' }}>
-                                    <Rating value={driver.review.rating} readOnly />
-                                    <Typography variant="body2" sx={{ ml: 1 }}>
-                                        {driver.review.comment}
-                                    </Typography>
-                                </Box>
-
-                                <Typography variant="h6" color="primary" sx={{ mt: 2 }}>
-                                    R$ {driver.value.toFixed(2)}
+                                <Typography variant="body2" sx={{ mt: 1 }}>
+                                    Rating: {driver.rating}/5
                                 </Typography>
-
+                                <Typography variant="body2" color="text.secondary">
+                                    {driver.description}
+                                </Typography>
+                                <Typography variant="h6" sx={{ mt: 2 }}>
+                                    ${driver.value.toFixed(2)}
+                                </Typography>
+                            </CardContent>
+                            <CardActions>
                                 <Button
-                                    variant="contained"
                                     fullWidth
-                                    sx={{ mt: 2 }}
+                                    variant="contained"
                                     onClick={() => handleConfirm(driver)}
                                     disabled={loading}
                                 >
-                                    {loading ? <CircularProgress size={24} /> : 'Choose Driver'}
+                                    {loading ? <CircularProgress size={24} /> : 'Select Driver'}
                                 </Button>
-                            </CardContent>
+                            </CardActions>
                         </Card>
                     </Grid>
                 ))}

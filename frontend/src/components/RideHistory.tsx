@@ -13,7 +13,8 @@ import {
     TableHead,
     TableRow,
     Alert,
-    CircularProgress
+    CircularProgress,
+    Chip
 } from '@mui/material';
 import { getRideHistory } from '../services/api';
 import { RideHistory as RideHistoryType } from '../types';
@@ -31,8 +32,19 @@ export const RideHistory: React.FC = () => {
         { id: 3, name: 'James Bond' }
     ];
 
-    const fetchHistory = async () => {
-        if (!customerId) {
+    // Load history automatically if customerId is in localStorage
+    useEffect(() => {
+        const storedCustomerId = localStorage.getItem('customerId');
+        if (storedCustomerId) {
+            setCustomerId(storedCustomerId);
+            fetchHistory(storedCustomerId);
+        }
+    }, []);
+
+    const fetchHistory = async (customerIdToFetch?: string) => {
+        const idToUse = customerIdToFetch || customerId;
+        
+        if (!idToUse) {
             setError('Please enter a customer ID');
             return;
         }
@@ -41,17 +53,42 @@ export const RideHistory: React.FC = () => {
         setLoading(true);
 
         try {
+            console.log('Fetching history for customer:', idToUse);
             const response = await getRideHistory(
-                customerId,
+                idToUse,
                 selectedDriver ? parseInt(selectedDriver) : undefined
             );
+            console.log('History response:', response);
             setRides(response.rides);
+            if (response.rides.length === 0) {
+                setError('No rides found for this customer');
+            }
         } catch (err: any) {
+            console.error('Error fetching history:', err);
             const apiError = err.response?.data;
             setError(apiError?.error_description || 'Failed to fetch ride history');
+            setRides([]);
         } finally {
             setLoading(false);
         }
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status.toLowerCase()) {
+            case 'completed':
+                return 'success';
+            case 'in_progress':
+            case 'active':
+                return 'warning';
+            case 'cancelled':
+                return 'error';
+            default:
+                return 'default';
+        }
+    };
+
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleString();
     };
 
     return (
@@ -65,7 +102,10 @@ export const RideHistory: React.FC = () => {
                     <TextField
                         label="Customer ID"
                         value={customerId}
-                        onChange={(e) => setCustomerId(e.target.value)}
+                        onChange={(e) => {
+                            setCustomerId(e.target.value);
+                            setRides([]); // Clear rides when customer ID changes
+                        }}
                         sx={{ flexGrow: 1 }}
                     />
 
@@ -73,7 +113,12 @@ export const RideHistory: React.FC = () => {
                         select
                         label="Driver"
                         value={selectedDriver}
-                        onChange={(e) => setSelectedDriver(e.target.value)}
+                        onChange={(e) => {
+                            setSelectedDriver(e.target.value);
+                            if (customerId) {
+                                fetchHistory();
+                            }
+                        }}
                         sx={{ width: 200 }}
                     >
                         <MenuItem value="">All Drivers</MenuItem>
@@ -86,7 +131,7 @@ export const RideHistory: React.FC = () => {
 
                     <Button
                         variant="contained"
-                        onClick={fetchHistory}
+                        onClick={() => fetchHistory()}
                         disabled={loading}
                         sx={{ minWidth: 120 }}
                     >
@@ -94,38 +139,58 @@ export const RideHistory: React.FC = () => {
                     </Button>
                 </Box>
 
-                {error && <Alert severity="error">{error}</Alert>}
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-                {rides.length > 0 && (
-                    <TableContainer>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Ride ID</TableCell>
-                                    <TableCell>Customer ID</TableCell>
-                                    <TableCell>Driver</TableCell>
-                                    <TableCell>Origin</TableCell>
-                                    <TableCell>Destination</TableCell>
-                                    <TableCell>Status</TableCell>
-                                    <TableCell>Price</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {rides.map((ride) => (
-                                    <TableRow key={ride.id}>
+                <TableContainer>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>Ride ID</TableCell>
+                                <TableCell>Customer ID</TableCell>
+                                <TableCell>Driver</TableCell>
+                                <TableCell>Origin</TableCell>
+                                <TableCell>Destination</TableCell>
+                                <TableCell>Status</TableCell>
+                                <TableCell align="right">Price</TableCell>
+                                <TableCell>Date</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {rides.length > 0 ? (
+                                rides.map((ride) => (
+                                    <TableRow key={ride.id} hover>
                                         <TableCell>{ride.id}</TableCell>
                                         <TableCell>{ride.customer_id}</TableCell>
                                         <TableCell>{ride.driver_name}</TableCell>
                                         <TableCell>{ride.origin}</TableCell>
                                         <TableCell>{ride.destination}</TableCell>
-                                        <TableCell>{ride.status}</TableCell>
-                                        <TableCell>${ride.price.toFixed(2)}</TableCell>
+                                        <TableCell>
+                                            <Chip 
+                                                label={ride.status} 
+                                                color={getStatusColor(ride.status) as any}
+                                                size="small"
+                                            />
+                                        </TableCell>
+                                        <TableCell align="right">${typeof ride.price === 'string' ? parseFloat(ride.price).toFixed(2) : ride.price.toFixed(2)}</TableCell>
+                                        <TableCell>{formatDate(ride.created_at)}</TableCell>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                )}
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={8} align="center">
+                                        {loading ? (
+                                            <CircularProgress size={20} sx={{ my: 2 }} />
+                                        ) : (
+                                            <Typography variant="body2" color="text.secondary">
+                                                No rides to display
+                                            </Typography>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
             </Paper>
         </Box>
     );

@@ -30,86 +30,114 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Request logging middleware
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path}`, {
+        body: req.body,
+        query: req.query,
+        params: req.params
+    });
+    next();
+});
+
 // Health check endpoint
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
 });
 
+// Test endpoint
+app.get('/test', (_req, res) => {
+    res.json({ message: 'Test endpoint working' });
+});
+
+// Mount ride routes
+const rideRouter = initializeRoutes();
+app.use('/ride', rideRouter);
+
+// Error handling middleware
+app.use(errorHandler);
+
 // Initial driver data
 const initialDrivers = [
     {
-        name: 'John Doe',
-        vehicle: 'Toyota Corolla',
-        rating: 4.8,
-        reviewComment: 'Great driver, very punctual',
-        ratePerKm: 2.5,
-        minDistance: 3,
-        description: 'Experienced driver with 5 years of service'
+        name: 'Homer Simpson',
+        vehicle: 'Plymouth Valiant 1973 rosa e enferrujado',
+        rating: 2.0,
+        reviewComment: 'Motorista simpático, mas errou o caminho 3 vezes. O carro cheira a donuts.',
+        ratePerKm: 2.50,
+        minDistance: 1,
+        description: 'Olá! Sou o Homer, seu motorista camarada! Relaxe e aproveite o passeio, com direito a rosquinhas e boas risadas (e talvez alguns desvios).'
     },
     {
-        name: 'Jane Smith',
-        vehicle: 'Honda Civic',
-        rating: 4.9,
-        reviewComment: 'Very professional and friendly',
-        ratePerKm: 2.8,
-        minDistance: 2,
-        description: 'Professional driver with excellent customer service'
+        name: 'Dominic Toretto',
+        vehicle: 'Dodge Charger R/T 1970 modificado',
+        rating: 4.0,
+        reviewComment: 'Que viagem incrível! O carro é um show à parte e o motorista, apesar de ter uma cara de poucos amigos, foi super gente boa. Recomendo!',
+        ratePerKm: 5.00,
+        minDistance: 5,
+        description: 'Ei, aqui é o Dom. Pode entrar, vou te levar com segurança e rapidez ao seu destino. Só não mexa no rádio, a playlist é sagrada.'
+    },
+    {
+        name: 'James Bond',
+        vehicle: 'Aston Martin DB5 clássico',
+        rating: 5.0,
+        reviewComment: 'Serviço impecável! O motorista é a própria definição de classe e o carro é simplesmente magnífico. Uma experiência digna de um agente secreto.',
+        ratePerKm: 10.00,
+        minDistance: 10,
+        description: 'Boa noite, sou James Bond. À seu dispor para um passeio suave e discreto. Aperte o cinto e aproveite a viagem.'
     }
 ];
 
 // Helper function to wait for database
-const waitForDatabase = async (maxRetries = 5, delay = 5000): Promise<void> => {
+async function waitForDatabase(maxRetries = 5, delay = 5000): Promise<void> {
     let retries = 0;
     while (retries < maxRetries) {
         try {
-            if (AppDataSource.isInitialized) {
-                await AppDataSource.query('SELECT 1');
-            } else {
-                await AppDataSource.initialize();
-            }
-            console.log('Database connection established');
+            await AppDataSource.initialize();
+            console.log('Database connected successfully');
             return;
         } catch (error) {
+            console.error('Failed to connect to database:', error);
             retries++;
-            console.log(`Database connection attempt ${retries}/${maxRetries} failed:`, error.message);
-            if (retries < maxRetries) {
-                console.log(`Retrying in ${delay/1000} seconds...`);
-                await new Promise(resolve => setTimeout(resolve, delay));
+            if (retries === maxRetries) {
+                throw new Error('Failed to connect to database after maximum retries');
             }
+            console.log(`Retrying in ${delay / 1000} seconds...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
-    throw new Error('Failed to connect to database after multiple attempts');
-};
+}
 
 // Database connection and server start
-const startServer = async () => {
+async function startServer() {
     try {
-        // Wait for database to be ready
         await waitForDatabase();
 
-        // Seed initial drivers data
+        // Initialize initial data
         const driverRepository = AppDataSource.getRepository(Driver);
         const existingDrivers = await driverRepository.find();
 
         if (existingDrivers.length === 0) {
+            console.log('Initializing driver data...');
             await driverRepository.save(initialDrivers);
-            console.log('Initial drivers data seeded');
+            console.log('Driver data initialized successfully');
         }
-
-        // Initialize and add routes after database connection
-        app.use('/ride', initializeRoutes());
-
-        // Error handling
-        app.use(errorHandler);
 
         const port = process.env.PORT || 8080;
         app.listen(port, () => {
-            console.log(`Server running on port ${port}`);
+            console.log(`Server is running on port ${port}`);
+            console.log('Available endpoints:');
+            console.log('- GET /health');
+            console.log('- GET /test');
+            console.log('- POST /ride/estimate');
+            console.log('- POST /ride/confirm');
+            console.log('- GET /ride/history/:customer_id');
+            console.log('- GET /ride/active');
         });
     } catch (error) {
         console.error('Failed to start server:', error);
         process.exit(1);
     }
-};
+}
 
 startServer();

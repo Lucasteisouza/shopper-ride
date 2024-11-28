@@ -30,6 +30,9 @@ export class Ride {
     @CreateDateColumn()
     createdAt: Date;
 
+    @Column({ nullable: true, type: 'timestamp' })
+    completedAt: Date;
+
     @Column('decimal')
     originLat: number;
 

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { RouteEstimate, RideHistory } from '../types';
 
 const api = axios.create({
-    baseURL: 'http://localhost:8080'
+    baseURL: '/api'
 });
 
 export const estimateRide = async (
@@ -30,7 +30,7 @@ export const confirmRide = async (rideData: {
     };
     value: number;
 }) => {
-    const response = await api.patch('/ride/confirm', rideData);
+    const response = await api.post('/ride/confirm', rideData);
     return response.data;
 };
 
@@ -38,6 +38,11 @@ export const getRideHistory = async (
     customerId: string,
     driverId?: number
 ): Promise<{ customer_id: string; rides: RideHistory[] }> => {
-    const response = await api.get(`/ride/${customerId}${driverId ? `?driver_id=${driverId}` : ''}`);
+    const response = await api.get(`/ride/history/${customerId}${driverId ? `?driver_id=${driverId}` : ''}`);
+    return response.data;
+};
+
+export const completeRide = async (rideId: number) => {
+    const response = await api.post(`/ride/${rideId}/complete`);
     return response.data;
 };

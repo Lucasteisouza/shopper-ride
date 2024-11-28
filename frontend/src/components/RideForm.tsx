@@ -27,12 +27,42 @@ export const RideForm: React.FC<RideFormProps> = ({ onEstimateSuccess }) => {
         setError('');
         setLoading(true);
 
+        // Validate inputs
+        if (!customerId.trim()) {
+            setError('Please enter a customer ID');
+            setLoading(false);
+            return;
+        }
+
+        if (!origin.trim()) {
+            setError('Please enter a pickup location');
+            setLoading(false);
+            return;
+        }
+
+        if (!destination.trim()) {
+            setError('Please enter a destination');
+            setLoading(false);
+            return;
+        }
+
         try {
-            const estimate = await estimateRide(customerId, origin, destination);
+            // Store values in localStorage
+            localStorage.setItem('customerId', customerId.trim());
+            localStorage.setItem('origin', origin.trim());
+            localStorage.setItem('destination', destination.trim());
+
+            const estimate = await estimateRide(customerId.trim(), origin.trim(), destination.trim());
             onEstimateSuccess(estimate);
         } catch (err: any) {
-            const apiError = err.response?.data as ApiError;
+            console.error('RideForm: Error occurred:', err);
+            const apiError = err.response?.data;
             setError(apiError?.error_description || 'Failed to estimate ride');
+            
+            // Clear localStorage on error
+            localStorage.removeItem('customerId');
+            localStorage.removeItem('origin');
+            localStorage.removeItem('destination');
         } finally {
             setLoading(false);
         }

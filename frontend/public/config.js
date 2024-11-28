@@ -1,0 +1,1 @@
+window.GOOGLE_API_KEY = 'AIzaSyBZJXfvjXdk-14ZPrT6n7tGmP2kYtKaIWw';
