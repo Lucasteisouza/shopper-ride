@@ -1,6 +1,6 @@
 # 🚗 Shopper Ride
 
-Este projeto é parte do teste técnico para a vaga de Desenvolvedor Full Stack na Shopper.
+Este projeto é uma prova de conceito com finalidade educacional
 
 ## Sobre o Projeto
 Shopper Ride é uma aplicação de compartilhamento de caronas que permite aos usuários solicitar viagens de um ponto A até um ponto B. Os usuários podem escolher entre diferentes motoristas, cada um com suas próprias características e preços.
